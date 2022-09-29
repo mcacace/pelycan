@@ -10,13 +10,13 @@
     type = ParsedFunction
     value = 'fs+dev'
     vars = 'fs dev'
-    vals = '1 -0.3'
+    vals = '1 0.4'
   [../]
   [./T_ini]
     type = ParsedFunction
     value = 'Ts+dev'
     vars = 'Ts dev'
-    vals = '0.5 -0.1'
+    vals = '0.5 0.15'
   [../]
 []
 
@@ -43,7 +43,6 @@
   [./KernelF]
     type = PelycanKernelF
     variable = f
-    # mult = -1
   [../]
   [./KernelTimeT]
     type = PelycanKernelTime
@@ -52,7 +51,6 @@
   [./KernelT]
     type = PelycanKernelT
     variable = T
-    # mult = -1
   [../]
 []
 
@@ -61,7 +59,6 @@
     type = PelycanMaterial
      T = T
      f = f
-     # use_old_vars = false
      Lo = 140000
      So = 42000
      act_Q = 0.0
@@ -248,9 +245,9 @@
   dt = 1e-1
   automatic_scaling = true
   compute_scaling_once = false
-  # [./TimeIntegrator]
-  #   type = AStableDirk4
-  # [../]
+  [./TimeIntegrator]
+    type = LStableDirk4
+  [../]
 []
 
 [Outputs]

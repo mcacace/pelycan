@@ -7,13 +7,11 @@ PelycanKernelT::validParams()
 {
   InputParameters params = Kernel::validParams();
   params.addClassDescription("Compute the evolution of the temperature.");
-  params.addParam<Real>("mult", 1.0, "Multiplication factor.");
   return params;
 }
 
 PelycanKernelT::PelycanKernelT(const InputParameters & parameters)
   : DerivativeMaterialInterface<Kernel>(parameters),
-    _mult(getParam<Real>("mult")),
     _eps_dot(getDefaultMaterialProperty<Real>("strain_rate")),
     _Tc(getDefaultMaterialProperty<Real>("Tc"))
 {

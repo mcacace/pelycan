@@ -10,13 +10,13 @@
     type = ParsedFunction
     value = 'fs+dev'
     vars = 'fs dev'
-    vals = '1 -0.3'
+    vals = '1 0.4'
   [../]
   [./T_ini]
     type = ParsedFunction
     value = 'Ts+dev'
     vars = 'Ts dev'
-    vals = '0.5 -0.1'
+    vals = '0.5 0.15'
   [../]
 []
 
@@ -59,7 +59,6 @@
     type = PelycanMaterial
      T = T
      f = f
-     use_old_vars = false
      Lo = 140000
      So = 42000
      act_Q = 0.0
@@ -70,10 +69,10 @@
      diff = 1e-06
      rho_m = 3300
      rho_c = 2800
-     rho_o = 3260
+     rho_o = 3.26e3
      grav = 9.81
      Ho = 0
-     alhpa = 3e-05
+     alpha = 3e-05
   [../]
 []
 
