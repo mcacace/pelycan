@@ -69,7 +69,7 @@ PelycanMaterial::computeAdimensionalConstants()
   _Q_adim = _act_Q / _R_const / _Tl;
   _h_ratio = _So / _Lo;
   _energy = (_Co * std::pow(_Lo, 2.0)) / (std::pow(PI, 2.0) * _diff);
-  _energy *= (_grav * _rho_m * _Lo);
+  _energy *= std::pow(_grav * _rho_m * _Lo, _n_exp);
   _H_rate = (_Ho * std::pow(_So, 2.0)) / (_diff * _Tl);
   _rho_ratio = (_rho_m - _rho_c) / _rho_m;
   _T_ratio = (_rho_o * _alpha * _Tl) / _rho_m;
