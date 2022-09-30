@@ -51,6 +51,7 @@ protected:
   MaterialProperty<Real> & _DE;
   MaterialProperty<Real> & _eps_dot;
   MaterialProperty<Real> & _Tc;
+  MaterialProperty<Real> & _En;
 
   MaterialProperty<Real> & _deps_dT;
   MaterialProperty<Real> & _deps_df;

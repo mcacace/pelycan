@@ -57,6 +57,7 @@ PelycanMaterial::PelycanMaterial(const InputParameters & parameters)
     _DE(declareProperty<Real>("dpotential_energy")),
     _eps_dot(declareProperty<Real>("strain_rate")),
     _Tc(declareProperty<Real>("Tc")),
+    _En(declareProperty<Real>("En")),
     _deps_dT(declareProperty<Real>("deps_dT")),
     _deps_df(declareProperty<Real>("deps_df"))
 {
@@ -74,6 +75,7 @@ PelycanMaterial::computeAdimensionalConstants()
   _rho_ratio = (_rho_m - _rho_c) / _rho_m;
   _T_ratio = (_rho_o * _alpha * _Tl) / _rho_m;
   _T_cr = 0.5 + (_H_rate / 4.0) * (1.0 - (2.0 / 3.0) * _h_ratio);
+  // mooseError("H_rate = ", _H_rate, " So = ", _So, " diff = ", _diff, " Tl = ", _Tl);
 }
 
 void
@@ -96,7 +98,7 @@ PelycanMaterial::computeQpProperties()
   Real deg = (2.0 - f_var * _h_ratio);
   Real deh = 2.0 - _h_ratio;
   _DE[_qp] = dea * (deb - dec - std::pow(ded, 2.0) -
-                    dee * (def * std::pow(deg, 2.0) - std::pow(def, 2.0)));
+                    dee * (def * std::pow(deg, 2.0) - std::pow(deh, 2.0)));
   Real ea = 0.5 * _rho_ratio;
   Real eb = _L[_qp] - f_var * _h_ratio;
   Real ec = 1.0 - _h_ratio;
@@ -104,7 +106,12 @@ PelycanMaterial::computeQpProperties()
   Real ee = std::pow(_L[_qp], 2.0) - 1.0;
   _E[_qp] = ea * (std::pow(eb, 2.0) - std::pow(ec, 2.0)) + ed * ee + _DE[_qp];
   Real epsa = 1.0 / _T_cr - 1.0 / T_var;
-  _eps_dot[_qp] = _energy * std::pow(_E[_qp] / _L[_qp], _n_exp) * std::exp(_Q_adim * epsa);
+  Real ratio = _E[_qp] / _L[_qp];
+  Real nexp = _n_exp;
+  if (ratio < 0.0 && (_n_exp > 1 && _n_exp < 2))
+    nexp = 1.0;
+  _eps_dot[_qp] = _energy * std::pow(ratio, nexp) * std::exp(_Q_adim * epsa);
+  _En[_qp] = _energy;
   computeKernelMaterialProperties();
 }
 
