@@ -9,6 +9,7 @@ public:
   PelycanMaterial(const InputParameters & parameters);
 
 protected:
+  virtual void initQpStatefulProperties() override;
   virtual void computeQpProperties() override;
 
   void computeAdimensionalConstants();
@@ -37,6 +38,9 @@ protected:
   const Real _rho_c;
   const Real _alpha;
 
+  Real _C_erosion;
+  Real _tau_erosion;
+
   Real _Q_adim;
   Real _h_ratio;
   Real _energy;
@@ -52,6 +56,9 @@ protected:
   MaterialProperty<Real> & _eps_dot;
   MaterialProperty<Real> & _Tc;
   MaterialProperty<Real> & _En;
+  MaterialProperty<Real> & _dsediment;
+  MaterialProperty<Real> & _sediment;
+  const MaterialProperty<Real> & _sediment_old;
 
   MaterialProperty<Real> & _deps_dT;
   MaterialProperty<Real> & _deps_df;
