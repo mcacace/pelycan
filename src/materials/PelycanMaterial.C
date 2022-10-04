@@ -84,6 +84,8 @@ PelycanMaterial::computeAdimensionalConstants()
   _T_cr = 0.5 + (_H_rate / 4.0) * (1.0 - (2.0 / 3.0) * _h_ratio);
   _C_erosion *= (_Lo / (std::pow(PI, 2.0) * _diff));
   _tau_erosion /= (std::pow(_Lo, 2.0)) / (std::pow(PI, 2.0) * _diff);
+
+  // mooseError("erodability = ", _C_erosion, " tau = ", _tau_erosion);
 }
 
 void
@@ -108,9 +110,8 @@ PelycanMaterial::computeQpProperties()
       _dsediment[_qp] = std::min(_C_erosion * std::exp(_dt / _tau_erosion), _L[_qp] - 1.0);
     else if (_L[_qp] < 1.0)
       _dsediment[_qp] = -1.0 * _C_erosion * std::exp(_dt / _tau_erosion);
-    _L[_qp] -= _dsediment[_qp];
-
     _sediment[_qp] = _sediment_old[_qp] + _dsediment[_qp];
+    _L[_qp] -= (_dsediment[_qp]) * _dt;
   }
   Real tca = (_H_rate / 4.0);
   Real tcb = (1.0 - (2.0 / 3.0) * f_var * _h_ratio);
