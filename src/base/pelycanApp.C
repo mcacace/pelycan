@@ -8,7 +8,8 @@ InputParameters
 pelycanApp::validParams()
 {
   InputParameters params = MooseApp::validParams();
-
+  // Do not use legacy material output
+  params.set<bool>("use_legacy_material_output") = false;
   return params;
 }
 
