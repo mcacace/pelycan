@@ -13,6 +13,8 @@ protected:
   virtual Real computeQpResidual() override;
   virtual Real computeQpJacobian() override;
 
+  const Real _limit_strain_rate;
+
   const MaterialProperty<Real> & _eps_dot;
   const MaterialProperty<Real> & _Tc;
 };
