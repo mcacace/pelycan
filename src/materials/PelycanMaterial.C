@@ -28,8 +28,19 @@ PelycanMaterial::validParams()
   params.addParam<Real>("Ho", 0.0, "The rate of crustal heat generation.");
   params.addParam<Real>("rho_c", 2.8e3, "The density of the crust.");
   params.addParam<Real>("alpha", 3e-5, "The coefficient of thermal expansion.");
-  params.addParam<Real>("C_erosion", 0.0, "The erodability constant.");
-  params.addParam<Real>("tau_erosion", 1.0, "The erosion time constant.");
+  params.addParam<bool>(
+      "do_erosion_sedimentation", false, "Whether to compute erosion and sedimentation.");
+  params.addParam<MooseEnum>("erosion_type",
+                             PelycanMaterial::erosionType() = "constant_rate",
+                             "The type of the erosion model.");
+  params.addParam<Real>("erosion_rate", 0.0, "The rate of erosion.");
+  params.addParam<MooseEnum>("sedimentation_type",
+                             PelycanMaterial::sedimentationType() = "constant_rate",
+                             "The type of the sedimentation model.");
+  params.addParam<Real>("sedimentation_rate", 0.0, "The rate of sedimentation.");
+  params.addParam<Real>("max_sediment_thickness",
+                        1e19,
+                        "The limit of increase in sediment thickness during a single time step.");
   return params;
 }
 
@@ -54,8 +65,12 @@ PelycanMaterial::PelycanMaterial(const InputParameters & parameters)
     _Ho(getParam<Real>("Ho")),
     _rho_c(getParam<Real>("rho_c")),
     _alpha(getParam<Real>("alpha")),
-    _C_erosion(getParam<Real>("C_erosion")),
-    _tau_erosion(getParam<Real>("tau_erosion")),
+    _do_erosion_sedimentation(getParam<bool>("do_erosion_sedimentation")),
+    _erosion_type(getParam<MooseEnum>("erosion_type")),
+    _erosion_rate(getParam<Real>("erosion_rate")),
+    _sedimentation_type(getParam<MooseEnum>("sedimentation_type")),
+    _sedimentation_rate(getParam<Real>("sedimentation_rate")),
+    _max_sediment_thickness(getParam<Real>("max_sediment_thickness")),
     _L(declareProperty<Real>("thickness")),
     _E(declareProperty<Real>("potential_energy")),
     _DE(declareProperty<Real>("dpotential_energy")),
@@ -68,6 +83,8 @@ PelycanMaterial::PelycanMaterial(const InputParameters & parameters)
     _deps_dT(declareProperty<Real>("deps_dT")),
     _deps_df(declareProperty<Real>("deps_df"))
 {
+  if (_do_erosion_sedimentation && (_erosion_rate <= 0.0 || _sedimentation_rate <= 0.0))
+    mooseError("no negative rates are allowed");
   computeAdimensionalConstants();
 }
 
@@ -82,16 +99,58 @@ PelycanMaterial::computeAdimensionalConstants()
   _rho_ratio = (_rho_m - _rho_c) / _rho_m;
   _T_ratio = (_rho_o * _alpha * _Tl) / _rho_m;
   _T_cr = 0.5 + (_H_rate / 4.0) * (1.0 - (2.0 / 3.0) * _h_ratio);
-  _C_erosion *= (_Lo / (std::pow(PI, 2.0) * _diff));
-  _tau_erosion /= (std::pow(_Lo, 2.0)) / (std::pow(PI, 2.0) * _diff);
+  _erosion_rate *= (_Lo / (std::pow(PI, 2.0) * _diff));
+  _sedimentation_rate *= (_Lo / (std::pow(PI, 2.0) * _diff));
+}
 
-  // mooseError("erodability = ", _C_erosion, " tau = ", _tau_erosion);
+MooseEnum
+PelycanMaterial::erosionType()
+{
+  return MooseEnum("constant_rate=0");
+}
+
+MooseEnum
+PelycanMaterial::sedimentationType()
+{
+  return MooseEnum("constant_rate=0");
 }
 
 void
 PelycanMaterial::initQpStatefulProperties()
 {
   _sediment[_qp] = 0.0;
+}
+
+Real
+PelycanMaterial::computeErosionRate()
+{
+  Real value = 0.0;
+  switch (_erosion_type)
+  {
+    case 0: // constant rate
+      value = _erosion_rate;
+      break;
+    default:
+      mooseError("invalid erosion_type");
+      break;
+  }
+  return value;
+}
+
+Real
+PelycanMaterial::computeSedimentationRate()
+{
+  Real value = 0.0;
+  switch (_sedimentation_type)
+  {
+    case 0: // constant rate
+      value = _sedimentation_rate;
+      break;
+    default:
+      mooseError("invalid sedimentation_type");
+      break;
+  }
+  return value;
 }
 
 void
@@ -103,16 +162,17 @@ PelycanMaterial::computeQpProperties()
   Real lb = 1.0 + _T_ratio * (T_var - _T_cr);
   _L[_qp] = la * lb;
   // update topography for erosion/sedimentation
-  if (_C_erosion > 0.0)
+  _dsediment[_qp] = 0.0;
+  if (_do_erosion_sedimentation)
   {
-    _dsediment[_qp] = 0.0;
     if (_L[_qp] > 1.0)
-      _dsediment[_qp] = std::min(_C_erosion * std::exp(_dt / _tau_erosion), _L[_qp] - 1.0);
+      _dsediment[_qp] = -std::min(computeErosionRate() * _dt, _L[_qp] - 1.0);
     else if (_L[_qp] < 1.0)
-      _dsediment[_qp] = -1.0 * _C_erosion * std::exp(_dt / _tau_erosion);
-    _sediment[_qp] = _sediment_old[_qp] + _dsediment[_qp];
-    _L[_qp] -= (_dsediment[_qp]) * _dt;
+      _dsediment[_qp] = std::min(computeSedimentationRate() * _dt, _max_sediment_thickness);
   }
+  _sediment[_qp] = _sediment_old[_qp] + _dsediment[_qp];
+  _L[_qp] += _dsediment[_qp];
+
   Real tca = (_H_rate / 4.0);
   Real tcb = (1.0 - (2.0 / 3.0) * f_var * _h_ratio);
   _Tc[_qp] = 0.5 + std::pow(f_var, 2.0) * tca * tcb;

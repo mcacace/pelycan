@@ -7,6 +7,8 @@ class PelycanMaterial : public DerivativeMaterialInterface<Material>
 public:
   static InputParameters validParams();
   PelycanMaterial(const InputParameters & parameters);
+  static MooseEnum erosionType();
+  static MooseEnum sedimentationType();
 
 protected:
   virtual void initQpStatefulProperties() override;
@@ -14,6 +16,9 @@ protected:
 
   void computeAdimensionalConstants();
   void computeKernelMaterialProperties();
+
+  Real computeErosionRate();
+  Real computeSedimentationRate();
 
   const VariableValue & _f;
   const VariableValue & _f_old;
@@ -38,8 +43,14 @@ protected:
   const Real _rho_c;
   const Real _alpha;
 
-  Real _C_erosion;
-  Real _tau_erosion;
+  const bool _do_erosion_sedimentation;
+
+  MooseEnum _erosion_type;
+  Real _erosion_rate;
+
+  MooseEnum _sedimentation_type;
+  Real _sedimentation_rate;
+  const Real _max_sediment_thickness;
 
   Real _Q_adim;
   Real _h_ratio;

@@ -11,7 +11,7 @@ PelycanKernelT::validParams()
   params.addClassDescription("Compute the evolution of the temperature.");
   params.addParam<Real>(
       "limit_strain_rate",
-      -1e99,
+      -1e19,
       "The amount of strain rate (convergence) under which to fix the conductive heat flow at the "
       "base instead of the temperature.");
   return params;
