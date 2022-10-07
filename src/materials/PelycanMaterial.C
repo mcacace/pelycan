@@ -38,9 +38,6 @@ PelycanMaterial::validParams()
                              PelycanMaterial::sedimentationType() = "constant_rate",
                              "The type of the sedimentation model.");
   params.addParam<Real>("sedimentation_rate", 0.0, "The rate of sedimentation.");
-  params.addParam<Real>("max_sediment_thickness",
-                        1e19,
-                        "The limit of increase in sediment thickness during a single time step.");
   return params;
 }
 
@@ -70,7 +67,6 @@ PelycanMaterial::PelycanMaterial(const InputParameters & parameters)
     _erosion_rate(getParam<Real>("erosion_rate")),
     _sedimentation_type(getParam<MooseEnum>("sedimentation_type")),
     _sedimentation_rate(getParam<Real>("sedimentation_rate")),
-    _max_sediment_thickness(getParam<Real>("max_sediment_thickness")),
     _L(declareProperty<Real>("thickness")),
     _E(declareProperty<Real>("potential_energy")),
     _DE(declareProperty<Real>("dpotential_energy")),
@@ -80,11 +76,15 @@ PelycanMaterial::PelycanMaterial(const InputParameters & parameters)
     _dsediment(declareProperty<Real>("dsediment")),
     _sediment(declareProperty<Real>("sediment")),
     _sediment_old(getMaterialPropertyOld<Real>("sediment")),
+    _u_rate(declareProperty<Real>("uplift_rate")),
+    _e_rate(declareProperty<Real>("erosion_rate")),
+    _sed_rate(declareProperty<Real>("sedimentation_rate")),
+    _topography(declareProperty<Real>("topography")),
     _deps_dT(declareProperty<Real>("deps_dT")),
     _deps_df(declareProperty<Real>("deps_df"))
 {
-  if (_do_erosion_sedimentation && (_erosion_rate <= 0.0 || _sedimentation_rate <= 0.0))
-    mooseError("no negative rates are allowed");
+  // if (_do_erosion_sedimentation && (_erosion_rate < 0.0 || _sedimentation_rate < 0.0))
+  //   mooseError("no negative rates (for either sedimention and/or erosion) are allowed");
   computeAdimensionalConstants();
 }
 
@@ -128,9 +128,9 @@ PelycanMaterial::computeErosionRate()
   switch (_erosion_type)
   {
     case 0: // constant rate
-      value = _erosion_rate;
+      value = _erosion_rate * (_L[_qp] - 1.0);
       break;
-    default:
+    default: // none
       mooseError("invalid erosion_type");
       break;
   }
@@ -144,9 +144,9 @@ PelycanMaterial::computeSedimentationRate()
   switch (_sedimentation_type)
   {
     case 0: // constant rate
-      value = _sedimentation_rate;
+      value = _sedimentation_rate * (1.0 - _L[_qp]);
       break;
-    default:
+    default: // none
       mooseError("invalid sedimentation_type");
       break;
   }
@@ -158,24 +158,37 @@ PelycanMaterial::computeQpProperties()
 {
   Real f_var = _use_old_vars ? _f_old[_qp] : _f[_qp];
   Real T_var = _use_old_vars ? _T_old[_qp] : _T[_qp];
+  // components to the isostatic balance from tectonics
   Real la = 1.0 + _rho_ratio * _h_ratio * (f_var - 1.0);
   Real lb = 1.0 + _T_ratio * (T_var - _T_cr);
   _L[_qp] = la * lb;
+  // tectonic uplift rate
+  _u_rate[_qp] = (_t == 0.0) ? 0.0 : (_L[_qp] - 1.0) / _dt;
   // update topography for erosion/sedimentation
-  _dsediment[_qp] = 0.0;
-  if (_do_erosion_sedimentation)
+  if (_do_erosion_sedimentation && _t > 0.0)
   {
+    // compute rates of erosion/sedimentation
     if (_L[_qp] > 1.0)
-      _dsediment[_qp] = -std::min(computeErosionRate() * _dt, _L[_qp] - 1.0);
+      _e_rate[_qp] = computeErosionRate();
     else if (_L[_qp] < 1.0)
-      _dsediment[_qp] = std::min(computeSedimentationRate() * _dt, _max_sediment_thickness);
+      _sed_rate[_qp] = computeSedimentationRate();
+    // compute the isostatic response only to erosion/sedimentation
+    if (_L[_qp] > 1.0)
+      _dsediment[_qp] = -_rho_ratio * std::min(_e_rate[_qp] * _dt, _L[_qp] - 1.0);
+    else if (_L[_qp] < 1.0)
+      _dsediment[_qp] = _rho_ratio * std::min(_sed_rate[_qp] * _dt, 1.0 - _L[_qp]);
+    else
+      _dsediment[_qp] = 0.0;
+    // update the plate configuration
+    _L[_qp] += _dsediment[_qp];
   }
   _sediment[_qp] = _sediment_old[_qp] + _dsediment[_qp];
-  _L[_qp] += _dsediment[_qp];
-
+  _topography[_qp] = _L[_qp] - 1.0;
+  // thermal configuration
   Real tca = (_H_rate / 4.0);
   Real tcb = (1.0 - (2.0 / 3.0) * f_var * _h_ratio);
   _Tc[_qp] = 0.5 + std::pow(f_var, 2.0) * tca * tcb;
+  // contribution to the energy potential from thermal configuration
   Real dea = 0.5 * _T_ratio;
   Real deb = _Tc[_qp] + _T_cr * (std::pow(_L[_qp], 2.0) - 1.0);
   Real dec = T_var * (2.0 * _L[_qp] - 1.0);
@@ -186,12 +199,14 @@ PelycanMaterial::computeQpProperties()
   Real deh = 2.0 - _h_ratio;
   _DE[_qp] = dea * (deb - dec - std::pow(ded, 2.0) -
                     dee * (def * std::pow(deg, 2.0) - std::pow(deh, 2.0)));
+  // energy potential from isostatic balance
   Real ea = 0.5 * _rho_ratio;
   Real eb = _L[_qp] - f_var * _h_ratio;
   Real ec = 1.0 - _h_ratio;
   Real ed = 0.5 * (1.0 - _rho_ratio);
   Real ee = std::pow(_L[_qp], 2.0) - 1.0;
   _E[_qp] = ea * (std::pow(eb, 2.0) - std::pow(ec, 2.0)) + ed * ee + _DE[_qp];
+  // tectonic strain rate
   Real epsa = 1.0 / _T_cr - 1.0 / T_var;
   Real ratio = _E[_qp] / _L[_qp];
   Real nexp = _n_exp;
@@ -199,6 +214,7 @@ PelycanMaterial::computeQpProperties()
     nexp = 1.0;
   _eps_dot[_qp] = _energy * std::pow(ratio, nexp) * std::exp(_Q_adim * epsa);
   _En[_qp] = _energy;
+
   computeKernelMaterialProperties();
 }
 

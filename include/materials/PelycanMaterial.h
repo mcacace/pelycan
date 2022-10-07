@@ -22,6 +22,7 @@ protected:
 
   const VariableValue & _f;
   const VariableValue & _f_old;
+
   const VariableValue & _T;
   const VariableValue & _T_old;
 
@@ -50,7 +51,6 @@ protected:
 
   MooseEnum _sedimentation_type;
   Real _sedimentation_rate;
-  const Real _max_sediment_thickness;
 
   Real _Q_adim;
   Real _h_ratio;
@@ -70,6 +70,10 @@ protected:
   MaterialProperty<Real> & _dsediment;
   MaterialProperty<Real> & _sediment;
   const MaterialProperty<Real> & _sediment_old;
+  MaterialProperty<Real> & _u_rate;
+  MaterialProperty<Real> & _e_rate;
+  MaterialProperty<Real> & _sed_rate;
+  MaterialProperty<Real> & _topography;
 
   MaterialProperty<Real> & _deps_dT;
   MaterialProperty<Real> & _deps_df;
